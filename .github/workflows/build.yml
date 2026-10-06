@@ -1,0 +1,32 @@
+name: Build and API checks
+on: [push, pull_request]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      MSSQL_SA_PASSWORD: CiOnly-TaskLite-2026!
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build
+        run: dotnet build src/TaskLite.Web -c Release
+      - name: Start SQL Server and application
+        run: docker compose up --build -d --wait --wait-timeout 180
+      - name: Wait for API and check behavior
+        shell: pwsh
+        run: |
+          $ready = $false
+          for ($i = 0; $i -lt 30; $i++) {
+            try { Invoke-RestMethod http://localhost:8080/health | Out-Null; $ready = $true; break }
+            catch { Start-Sleep -Seconds 2 }
+          }
+          if (-not $ready) { throw 'API did not become ready.' }
+          ./scripts/Smoke.ps1
+      - name: Container logs
+        if: failure()
+        run: docker compose logs
+      - name: Stop containers
+        if: always()
+        run: docker compose down
