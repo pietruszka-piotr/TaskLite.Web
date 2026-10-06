@@ -2,22 +2,25 @@
 <html lang="pl">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>TaskLite</title><link rel="stylesheet" href="/style.css">
-  <script defer src="/app.js"></script>
+  <title>TaskLite</title><link rel="stylesheet" href="/style.css?v=3">
+  <script defer src="/app.js?v=3"></script>
 </head>
 <body>
 <main>
   <header><p class="eyebrow">Projekty i zadania</p><h1>TaskLite</h1><p>Lokalny planer. Dodaj projekt, zapisz zadania i pilnuj terminów.</p></header>
   <p id="message" role="status" aria-live="polite"></p>
   <section class="forms">
-    <form id="project-form"><h2>Nowy projekt</h2><label>Nazwa<input name="name" maxlength="100" required></label><button>Dodaj projekt</button></form>
+    <div class="project-column">
+      <form id="project-form"><h2>Nowy projekt</h2><label>Nazwa<input name="name" maxlength="100" required></label><button>Dodaj projekt</button></form>
+      <section class="project-panel"><h2>Twoje projekty</h2><ul id="projects" class="project-list"></ul></section>
+    </div>
     <form id="task-form"><h2 id="form-heading">Nowe zadanie</h2>
       <input name="id" type="hidden">
       <label>Projekt<select name="projectId" id="project-select" required></select></label>
       <label>Tytuł<input name="title" maxlength="120" required></label>
       <label>Opis<textarea name="description" maxlength="1000"></textarea></label>
       <div class="row"><label>Termin<input name="dueDate" type="date"></label><label>Status<select name="status"><option value="Todo">Do zrobienia</option><option value="InProgress">W trakcie</option><option value="Done">Zrobione</option></select></label></div>
-      <button>Zapisz zadanie</button><button type="button" id="cancel-edit" class="secondary" hidden>Anuluj edycję</button>
+      <button type="submit" id="save-task">Zapisz zadanie</button><button type="button" id="cancel-edit" class="secondary" hidden>Anuluj edycję</button>
     </form>
   </section>
   <section><h2>Lista zadań</h2>

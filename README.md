@@ -5,6 +5,7 @@ Mały planer projektów i zadań. Backend w C# udostępnia API, zapisuje dane w 
 ## Funkcje
 
 - dodawanie projektów z unikalną nazwą;
+- usuwanie pustych projektów; projekty z zadaniami są chronione przed usunięciem;
 - dodawanie, edycja i usuwanie zadań przypisanych do projektu;
 - statusy `Todo`, `InProgress`, `Done`, opis oraz opcjonalny termin;
 - filtrowanie po projekcie, statusie i tytule oraz stronicowanie;
@@ -59,7 +60,7 @@ pwsh -File scripts/Smoke.ps1
 pwsh -File scripts/Smoke.ps1 -BaseUrl http://localhost:5080
 ```
 
-Skrypt sprawdza zapis i odczyt, relację z projektem, filtr, zmianę statusu, usunięcie, błędne identyfikatory, limity stronicowania oraz niepoprawne dane. Korzysta z prawdziwej bazy aplikacji. Tworzy własny projekt z losową nazwą i usuwa swoje zadanie; pusty projekt testowy pozostaje w bazie. Workflow GitHub Actions buduje aplikację i wykonuje te same sprawdzenia w Compose.
+Skrypt sprawdza zapis i odczyt, relację z projektem, filtr, zmianę statusu, usunięcie, błędne identyfikatory, limity stronicowania oraz niepoprawne dane. Sprawdza również, że projekt z zadaniami nie może zostać usunięty, a po usunięciu zadania można usunąć pusty projekt i znika on z listy. Korzysta z prawdziwej bazy aplikacji. Tworzy własny projekt z losową nazwą i sprząta wyłącznie swoje zadanie i projekt w bloku `finally`, także gdy sprawdzenie zakończy się błędem. Workflow GitHub Actions buduje aplikację i wykonuje te same sprawdzenia w Compose.
 
 ## API
 
@@ -68,6 +69,7 @@ Skrypt sprawdza zapis i odczyt, relację z projektem, filtr, zmianę statusu, us
 | `GET /api/projects` | Lista projektów |
 | `GET /api/projects/{id}` | Jeden projekt |
 | `POST /api/projects` | Nowy projekt, np. `{"name":"Nauka SQL"}` |
+| `DELETE /api/projects/{id}` | Usunięcie pustego projektu: 204; brak projektu: 404; projekt z zadaniami: 409 |
 | `GET /api/tasks` | Lista z filtrami `projectId`, `status`, `search`, `page`, `pageSize` |
 | `GET /api/tasks/{id}` | Jedno zadanie |
 | `POST /api/tasks` | Nowe zadanie |
@@ -89,7 +91,7 @@ Przykładowe żądanie dodania zadania — `projectId` musi wskazywać utworzony
 
 ## Model i kod
 
-`Projects` ma wiele rekordów `Tasks`. Klucz obcy pilnuje przypisania do projektu. Nazwa projektu ma unikalny indeks, a zadania indeks `(ProjectId, Status, DueDate)`. Zapytanie raportowe z `LEFT JOIN` pokazuje również projekty bez zadań. Przy większej liczbie danych dobór indeksów wymaga sprawdzenia planu wykonania i pomiarów.
+`Projects` ma wiele rekordów `Tasks`. Klucz obcy pilnuje przypisania do projektu i blokuje usunięcie projektu, dopóki istnieją jego zadania. Po usunięciu pustego projektu ekran odświeża listę projektów w formularzu zadania i filtrze. Nazwa projektu ma unikalny indeks, a zadania indeks `(ProjectId, Status, DueDate)`. Zapytanie raportowe z `LEFT JOIN` pokazuje również projekty bez zadań. Przy większej liczbie danych dobór indeksów wymaga sprawdzenia planu wykonania i pomiarów.
 
 - `Program.cs`: konfiguracja usług, połączenia i aplikacji;
 - `Controllers`: operacje HTTP;

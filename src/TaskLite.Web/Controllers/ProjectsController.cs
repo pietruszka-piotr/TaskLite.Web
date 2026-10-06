@@ -40,4 +40,24 @@ public class ProjectsController(TaskLiteDbContext db) : ControllerBase
         }
         return CreatedAtAction(nameof(GetById), new { id = project.Id }, new { project.Id, project.Name });
     }
+
+    [HttpDelete("{id:int}")]
+    public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
+    {
+        var project = await db.Projects.FindAsync([id], cancellationToken);
+        if (project is null) return NotFound();
+        if (await db.Tasks.AnyAsync(t => t.ProjectId == id, cancellationToken))
+            return Conflict(new { error = "Projekt zawiera zadania. Najpierw usuń je albo przenieś do innego projektu." });
+
+        db.Projects.Remove(project);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is SqlException { Number: 547 })
+        {
+            return Conflict(new { error = "Projekt zawiera zadania. Najpierw usuń je albo przenieś do innego projektu." });
+        }
+        return NoContent();
+    }
 }

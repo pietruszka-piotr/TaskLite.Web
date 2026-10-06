@@ -3,6 +3,7 @@ const filterForm = document.querySelector('#filter-form');
 const statusLabels = { Todo: 'Do zrobienia', InProgress: 'W trakcie', Done: 'Zrobione' };
 let page = 1;
 let visibleTasks = [];
+let projectRequestVersion = 0;
 
 function message(text, error = false) {
   const box = document.querySelector('#message');
@@ -11,7 +12,7 @@ function message(text, error = false) {
 }
 
 async function api(path, options = {}) {
-  const response = await fetch(path, { ...options, headers: { 'Content-Type': 'application/json' } });
+  const response = await fetch(path, { ...options, cache: 'no-store', headers: { 'Content-Type': 'application/json' } });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
     throw new Error(body.error || Object.values(body.errors || {}).flat().join(' ') || `Błąd HTTP ${response.status}`);
@@ -20,7 +21,9 @@ async function api(path, options = {}) {
 }
 
 async function loadProjects() {
+  const requestVersion = ++projectRequestVersion;
   const projects = await api('/api/projects');
+  if (requestVersion !== projectRequestVersion) return;
   for (const selector of ['#project-select', '#project-filter']) {
     const select = document.querySelector(selector);
     const previous = select.value;
@@ -29,6 +32,20 @@ async function loadProjects() {
     for (const project of projects) select.add(new Option(project.name, project.id));
     if ([...select.options].some(option => option.value === previous)) select.value = previous;
   }
+  const list = document.querySelector('#projects');
+  list.replaceChildren();
+  if (!projects.length) {
+    const empty = document.createElement('li'); empty.textContent = 'Brak projektów. Dodaj pierwszy.'; list.append(empty);
+  }
+  for (const project of projects) {
+    const row = document.createElement('li');
+    const name = document.createElement('span'); name.textContent = project.name;
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'secondary';
+    button.textContent = 'Usuń'; button.dataset.id = project.id; button.dataset.action = 'delete';
+    button.setAttribute('aria-label', `Usuń projekt ${project.name}`);
+    row.append(name, button); list.append(row);
+  }
+  document.querySelector('#save-task').disabled = projects.length === 0;
 }
 
 async function loadTasks() {
@@ -76,6 +93,38 @@ document.querySelector('#project-form').addEventListener('submit', event => {
   });
 });
 
+document.querySelector('#projects').addEventListener('click', event => {
+  const button = event.target.closest('button[data-id]'); if (!button) return;
+  const row = button.closest('li');
+  const name = row.querySelector('span').textContent;
+  if (button.dataset.action === 'delete') {
+    button.dataset.action = 'confirm'; button.textContent = 'Potwierdź';
+    button.setAttribute('aria-label', `Potwierdź usunięcie projektu ${name}`);
+    const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'secondary';
+    cancel.textContent = 'Anuluj'; cancel.dataset.action = 'cancel'; cancel.dataset.id = button.dataset.id;
+    cancel.setAttribute('aria-label', `Anuluj usunięcie projektu ${name}`);
+    row.append(cancel);
+    message(`Potwierdź usunięcie projektu „${name}” albo anuluj.`);
+    return;
+  }
+  if (button.dataset.action === 'cancel') {
+    const confirmButton = row.querySelector('button[data-action="confirm"]');
+    confirmButton.dataset.action = 'delete'; confirmButton.textContent = 'Usuń';
+    confirmButton.setAttribute('aria-label', `Usuń projekt ${name}`);
+    button.remove(); message('Usuwanie anulowane.'); return;
+  }
+  button.disabled = true;
+  perform(async () => {
+    try {
+      await api(`/api/projects/${button.dataset.id}`, { method: 'DELETE' });
+      await loadProjects();
+      page = 1;
+      await loadTasks();
+      message('Projekt usunięty.');
+    } finally { button.disabled = false; }
+  });
+});
+
 taskForm.addEventListener('submit', event => {
   event.preventDefault(); perform(async () => {
     const values = Object.fromEntries(new FormData(taskForm));
@@ -105,4 +154,8 @@ filterForm.addEventListener('submit', event => { event.preventDefault(); page = 
 document.querySelector('#cancel-edit').addEventListener('click', resetEditor);
 document.querySelector('#previous').addEventListener('click', () => { page--; perform(loadTasks); });
 document.querySelector('#next').addEventListener('click', () => { page++; perform(loadTasks); });
+window.addEventListener('focus', () => perform(async () => { await loadProjects(); await loadTasks(); }));
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) perform(async () => { await loadProjects(); await loadTasks(); });
+});
 perform(async () => { await loadProjects(); await loadTasks(); });

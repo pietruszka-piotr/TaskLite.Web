@@ -19,17 +19,22 @@ function Assert($Condition, [string]$Message) { if (-not $Condition) { throw $Me
 
 Request 'GET' '/health' $null 200 | Out-Null
 $project = Request 'POST' '/api/projects' @{ name = "Smoke-$([Guid]::NewGuid().ToString('N'))" } 201
-Request 'GET' "/api/projects/$($project.id)" $null 200 | Out-Null
-Request 'POST' '/api/projects' @{ name = $project.name } 409 | Out-Null
-Request 'POST' '/api/projects' @{ name = '   ' } 400 | Out-Null
-$taskBody = @{ projectId = $project.id; title = '  Check SQL persistence  '; description = 'demo'; dueDate = '2026-10-20'; status = 'Todo' }
 $task = $null
+$checksPassed = $false
 try {
+    Request 'GET' "/api/projects/$($project.id)" $null 200 | Out-Null
+    Request 'POST' '/api/projects' @{ name = $project.name } 409 | Out-Null
+    Request 'POST' '/api/projects' @{ name = '   ' } 400 | Out-Null
+    $taskBody = @{ projectId = $project.id; title = '  Check SQL persistence  '; description = 'demo'; dueDate = '2026-10-20'; status = 'Todo' }
     $task = Request 'POST' '/api/tasks' $taskBody 201
     Assert ($task.title -eq 'Check SQL persistence') 'Title should be trimmed.'
     $read = Request 'GET' "/api/tasks/$($task.id)" $null 200
     Assert ($read.projectName -eq $project.name) 'Project relation was not saved.'
     Assert ($read.dueDate -eq '2026-10-20') 'Due date was not saved.'
+    Request 'DELETE' "/api/projects/$($project.id)" $null 409 | Out-Null
+    Request 'GET' "/api/projects/$($project.id)" $null 200 | Out-Null
+    $retainedTask = Request 'GET' "/api/tasks/$($task.id)" $null 200
+    Assert ($retainedTask.projectId -eq $project.id) 'Deleting a nonempty project should preserve its task.'
     $list = Request 'GET' "/api/tasks?projectId=$($project.id)&search=SQL&status=Todo&pageSize=1" $null 200
     Assert ($list.total -eq 1 -and $list.items[0].id -eq $task.id) 'Filtering or pagination is wrong.'
     $taskBody.title = '   '
@@ -57,10 +62,33 @@ try {
     Request 'DELETE' "/api/tasks/$($task.id)" $null 204 | Out-Null
     Request 'GET' "/api/tasks/$($task.id)" $null 404 | Out-Null
     Request 'DELETE' "/api/tasks/$($task.id)" $null 404 | Out-Null
-    Write-Host 'All API smoke checks passed against the configured database.'
+    Request 'DELETE' "/api/projects/$($project.id)" $null 204 | Out-Null
+    Request 'GET' "/api/projects/$($project.id)" $null 404 | Out-Null
+    Request 'DELETE' "/api/projects/$($project.id)" $null 404 | Out-Null
+    $projects = Request 'GET' '/api/projects' $null 200
+    Assert (@($projects | Where-Object { $_.id -eq $project.id }).Count -eq 0) 'Deleted project still appears in the project list.'
+    $checksPassed = $true
 } finally {
-    if ($task) {
-        Invoke-WebRequest -Uri "$BaseUrl/api/tasks/$($task.id)" -Method Delete -SkipHttpErrorCheck | Out-Null
+    $cleanupErrors = @()
+    # Delete only records created by this run, task first to respect the foreign key.
+    foreach ($path in @(
+        $(if ($task) { "/api/tasks/$($task.id)" })
+        "/api/projects/$($project.id)"
+    )) {
+        if (-not $path) { continue }
+        try {
+            $response = Invoke-WebRequest -Uri "$BaseUrl$path" -Method Delete -SkipHttpErrorCheck
+            if ([int]$response.StatusCode -notin @(204, 404)) {
+                throw "DELETE $path returned $($response.StatusCode): $($response.Content)"
+            }
+        } catch {
+            $cleanupErrors += $_.Exception.Message
+        }
+    }
+    if ($cleanupErrors.Count -gt 0) {
+        $cleanupMessage = "Smoke cleanup failed: $($cleanupErrors -join '; ')"
+        if ($checksPassed) { throw $cleanupMessage }
+        Write-Warning $cleanupMessage
     }
 }
-# The empty, uniquely named smoke project is retained; no unrelated rows are removed.
+Write-Host 'All API smoke checks passed against the configured database.'
