@@ -24,6 +24,7 @@ jobs:
           }
           if (-not $ready) { throw 'API did not become ready.' }
           ./scripts/Smoke.ps1
+          ./scripts/Sorting.ps1
       - name: Container logs
         if: failure()
         run: docker compose logs

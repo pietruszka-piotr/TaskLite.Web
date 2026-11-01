@@ -2,8 +2,8 @@
 <html lang="pl">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>TaskLite</title><link rel="stylesheet" href="/style.css?v=3">
-  <script defer src="/app.js?v=3"></script>
+  <title>TaskLite</title><link rel="stylesheet" href="/style.css?v=4">
+  <script defer src="/app.js?v=4"></script>
 </head>
 <body>
 <main>
@@ -24,7 +24,13 @@
     </form>
   </section>
   <section><h2>Lista zadań</h2>
-    <form id="filter-form" class="filters"><label>Szukaj<input name="search" maxlength="120" placeholder="Fragment tytułu"></label><label>Projekt<select name="projectId" id="project-filter"><option value="">Wszystkie</option></select></label><label>Status<select name="status"><option value="">Wszystkie</option><option value="Todo">Do zrobienia</option><option value="InProgress">W trakcie</option><option value="Done">Zrobione</option></select></label><button>Filtruj</button></form>
+    <form id="filter-form" class="filters">
+      <label>Szukaj<input name="search" maxlength="120" placeholder="Fragment tytułu"></label>
+      <label>Projekt<select name="projectId" id="project-filter"><option value="">Wszystkie</option></select></label>
+      <label>Status<select name="status"><option value="">Wszystkie</option><option value="Todo">Do zrobienia</option><option value="InProgress">W trakcie</option><option value="Done">Zrobione</option></select></label>
+      <label>Sortowanie<select name="sort" id="task-sort"><option value="oldest">Kolejność dodania</option><option value="newest">Ostatnio dodane</option><option value="dueDate">Termin - najbliższy</option></select></label>
+      <button>Filtruj</button>
+    </form>
     <p id="summary"></p><div id="tasks" class="task-list"></div>
     <nav class="pagination" aria-label="Strony zadań"><button id="previous" class="secondary">Poprzednia</button><span id="page-label"></span><button id="next" class="secondary">Następna</button></nav>
   </section>

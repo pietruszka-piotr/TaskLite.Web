@@ -12,17 +12,25 @@ public class TasksController(TaskLiteDbContext db) : ControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> Get(int? projectId, WorkItemStatus? status,
-        string? search, int page = 1, int pageSize = 20, CancellationToken cancellationToken = default)
+        string? search, string sort = "oldest", int page = 1, int pageSize = 20,
+        CancellationToken cancellationToken = default)
     {
         if (page < 1 || page > 100_000 || pageSize < 1 || pageSize > 100 ||
-            (status.HasValue && !Enum.IsDefined(status.Value)) || search?.Length > 120)
-            return BadRequest(new { error = "Invalid filter or pagination." });
+            (status.HasValue && !Enum.IsDefined(status.Value)) || search?.Length > 120 ||
+            sort is not ("oldest" or "newest" or "dueDate"))
+            return BadRequest(new { error = "Invalid filter, sort order or pagination." });
         var query = db.Tasks.AsNoTracking().Include(t => t.Project).AsQueryable();
         if (projectId.HasValue) query = query.Where(t => t.ProjectId == projectId);
         if (status.HasValue) query = query.Where(t => t.Status == status);
         if (!string.IsNullOrWhiteSpace(search)) query = query.Where(t => t.Title.Contains(search.Trim()));
         var total = await query.CountAsync(cancellationToken);
-        var tasks = await query.OrderBy(t => t.Id).Skip((page - 1) * pageSize)
+        var ordered = sort switch
+        {
+            "newest" => query.OrderByDescending(t => t.Id),
+            "dueDate" => query.OrderBy(t => t.DueDate == null).ThenBy(t => t.DueDate).ThenBy(t => t.Id),
+            _ => query.OrderBy(t => t.Id)
+        };
+        var tasks = await ordered.Skip((page - 1) * pageSize)
             .Take(pageSize).ToListAsync(cancellationToken);
         return Ok(new { items = tasks.Select(TaskResponse.From), total, page, pageSize });
     }

@@ -4,6 +4,7 @@ const statusLabels = { Todo: 'Do zrobienia', InProgress: 'W trakcie', Done: 'Zro
 let page = 1;
 let visibleTasks = [];
 let projectRequestVersion = 0;
+let taskRequestVersion = 0;
 
 function message(text, error = false) {
   const box = document.querySelector('#message');
@@ -49,10 +50,12 @@ async function loadProjects() {
 }
 
 async function loadTasks() {
+  const requestVersion = ++taskRequestVersion;
   const params = new URLSearchParams();
   for (const [key, value] of new FormData(filterForm)) if (value.trim()) params.set(key, value.trim());
   params.set('page', page); params.set('pageSize', 10);
   const result = await api(`/api/tasks?${params}`);
+  if (requestVersion !== taskRequestVersion) return;
   if (page > 1 && result.items.length === 0) { page--; return loadTasks(); }
   visibleTasks = result.items;
   const list = document.querySelector('#tasks');
@@ -151,6 +154,7 @@ document.querySelector('#tasks').addEventListener('click', event => {
 });
 
 filterForm.addEventListener('submit', event => { event.preventDefault(); page = 1; perform(loadTasks); });
+document.querySelector('#task-sort').addEventListener('change', () => { page = 1; perform(loadTasks); });
 document.querySelector('#cancel-edit').addEventListener('click', resetEditor);
 document.querySelector('#previous').addEventListener('click', () => { page--; perform(loadTasks); });
 document.querySelector('#next').addEventListener('click', () => { page++; perform(loadTasks); });

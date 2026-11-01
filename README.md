@@ -9,6 +9,7 @@ Mały planer projektów i zadań. Backend w C# udostępnia API, zapisuje dane w 
 - dodawanie, edycja i usuwanie zadań przypisanych do projektu;
 - statusy `Todo`, `InProgress`, `Done`, opis oraz opcjonalny termin;
 - filtrowanie po projekcie, statusie i tytule oraz stronicowanie;
+- sortowanie od najstarszych, od najnowszych lub według terminu, z zadaniami bez terminu na końcu;
 - walidacja danych na serwerze, migracje i trwały wolumen bazy;
 - dwa przykładowe raporty T-SQL w `sql/reports.sql`.
 
@@ -56,11 +57,15 @@ W tym wariancie ekran jest dostępny na [localhost:5080](http://localhost:5080).
 dotnet build TaskLite.slnx
 # Skrypt wymaga PowerShell 7 (pwsh):
 pwsh -File scripts/Smoke.ps1
+pwsh -File scripts/Sorting.ps1
 # Dla aplikacji uruchomionej przez dotnet:
 pwsh -File scripts/Smoke.ps1 -BaseUrl http://localhost:5080
+pwsh -File scripts/Sorting.ps1 -BaseUrl http://localhost:5080
 ```
 
 Skrypt sprawdza zapis i odczyt, relację z projektem, filtr, zmianę statusu, usunięcie, błędne identyfikatory, limity stronicowania oraz niepoprawne dane. Sprawdza również, że projekt z zadaniami nie może zostać usunięty, a po usunięciu zadania można usunąć pusty projekt i znika on z listy. Korzysta z prawdziwej bazy aplikacji. Tworzy własny projekt z losową nazwą i sprząta wyłącznie swoje zadanie i projekt w bloku `finally`, także gdy sprawdzenie zakończy się błędem. Workflow GitHub Actions buduje aplikację i wykonuje te same sprawdzenia w Compose.
+
+`Sorting.ps1` dodatkowo sprawdza kolejność terminów, zadania bez terminu, rozstrzyganie równych terminów po ID, sortowanie przed stronicowaniem oraz współpracę z filtrami. Sprawdza też odrzucenie nieznanej wartości sortowania. Tworzy dwa własne projekty i sześć zadań; blok `finally` usuwa te dane również po błędzie. Uruchamiaj skrypty na lokalnej bazie do programowania lub testów.
 
 ## API
 
@@ -70,14 +75,16 @@ Skrypt sprawdza zapis i odczyt, relację z projektem, filtr, zmianę statusu, us
 | `GET /api/projects/{id}` | Jeden projekt |
 | `POST /api/projects` | Nowy projekt, np. `{"name":"Nauka SQL"}` |
 | `DELETE /api/projects/{id}` | Usunięcie pustego projektu: 204; brak projektu: 404; projekt z zadaniami: 409 |
-| `GET /api/tasks` | Lista z filtrami `projectId`, `status`, `search`, `page`, `pageSize` |
+| `GET /api/tasks` | Lista z filtrami `projectId`, `status`, `search`, sortowaniem `sort` i stronicowaniem `page`, `pageSize` |
 | `GET /api/tasks/{id}` | Jedno zadanie |
 | `POST /api/tasks` | Nowe zadanie |
 | `PUT /api/tasks/{id}` | Zmiana wszystkich pól zadania |
 | `DELETE /api/tasks/{id}` | Usunięcie zadania |
 | `GET /health` | Połączenie z bazą: 200 albo 503 |
 
-Przykładowe żądanie dodania zadania — `projectId` musi wskazywać utworzony projekt:
+Parametr `sort` przyjmuje `oldest` (domyślnie), `newest` lub `dueDate`. Przy `dueDate` terminy są rosnące, brak terminu trafia na koniec, a równy termin rozstrzyga rosnące ID zadania. Sortowanie następuje przed podziałem na strony. Nieznana wartość zwraca 400.
+
+Przykładowe żądanie dodania zadania - `projectId` musi wskazywać utworzony projekt:
 
 ```json
 {

@@ -3,3 +3,5 @@
 .project-column{display:grid;gap:16px;align-content:start}.project-panel{padding:24px;border:1px solid #dce4e8;border-radius:12px;background:white}.project-list{list-style:none;padding:0;margin:0;display:grid;gap:12px}.project-list li{display:flex;align-items:center;justify-content:space-between;gap:12px}.project-list span{overflow-wrap:anywhere;min-width:0}.project-list button{flex-shrink:0}
 
 .project-list li{flex-wrap:wrap}.project-list span{flex:1 1 100%}
+
+.filters label{min-width:0}
